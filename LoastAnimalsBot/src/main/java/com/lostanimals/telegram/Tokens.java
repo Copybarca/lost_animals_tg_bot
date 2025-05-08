@@ -6,9 +6,9 @@ import java.io.IOException;
 import java.util.Properties;
 
 public class Tokens {
-    public static final String TELEGRAM_BOT_NAME;//= "HelpToFindAnimals_bot";
-    public static final String TELEGRAM_BOT_TOKEN;//="7545667379:AAGWDZk3O-Y1d6jyX77m2GE6bPDmrteFDU4";
-    public static final String OPEN_AI_TOKEN;//="dsdgdgs";
+    public static final String TELEGRAM_BOT_NAME;
+    public static final String TELEGRAM_BOT_TOKEN;
+    public static final String OPEN_AI_TOKEN;
     static{
         Properties prop = new Properties();
         String token = "src/main/resources/config/tgBot2.config";
