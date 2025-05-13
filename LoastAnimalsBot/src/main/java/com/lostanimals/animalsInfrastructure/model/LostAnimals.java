@@ -1,17 +1,21 @@
 package com.lostanimals.animalsInfrastructure.model;
 
+import com.lostanimals.animalsInfrastructure.appliedAnimalsEnums.AnimalType;
 import com.lostanimals.animalsInfrastructure.appliedAnimalsEnums.StatusType;
 import jakarta.persistence.*;
-/*
+
+import java.sql.Date;
+
 @Entity
-@Table(name = "lost_animals")*/
+@Table(name = "lost_animals")
 public class LostAnimals {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id; // Уникальный идентификатор
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false)
-    private String type; // Тип животного (например, собака, кошка и т.д.)
+    private AnimalType type; // Тип животного (например, собака, кошка и т.д.)
 
     @Column(name = "name", nullable = false)
     private String name; // Имя животного
@@ -35,6 +39,8 @@ public class LostAnimals {
     @Column(name = "description")
     private String description; // Описание животного
 
+    @Column(name = "date")
+    private Date date;
     @Lob // Указывает, что это большой объект
     @Column(name = "imageData")
     private byte[] imageData;
@@ -43,7 +49,7 @@ public class LostAnimals {
     @JoinColumn(name = "user_id", nullable = false) // Внешний ключ
     private User master;
 
-    public LostAnimals(User master, String description, StatusType status, String district, String city, Integer age, String sex, String name, String type) {
+    public LostAnimals(User master, String description, StatusType status, String district, String city, Integer age, String sex, String name, AnimalType type) {
         this.master = master;
         this.description = description;
         this.status = status;
@@ -54,12 +60,22 @@ public class LostAnimals {
         this.name = name;
         this.type = type;
     }
+    @Deprecated
+    public LostAnimals() {}
+
+    public Date getDate() {
+        return date;
+    }
+
+    public void setDate(Date date) {
+        this.date = date;
+    }
 
     public void setId(Long id) {
         this.id = id;
     }
 
-    public void setType(String type) {
+    public void setType(AnimalType type) {
         this.type = type;
     }
 
@@ -99,7 +115,7 @@ public class LostAnimals {
         return id;
     }
 
-    public String getType() {
+    public AnimalType getType() {
         return type;
     }
 

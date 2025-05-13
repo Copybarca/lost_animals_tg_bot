@@ -1,26 +1,31 @@
 package com.lostanimals.telegram;
 
+import com.lostanimals.animalsInfrastructure.appliedAnimalsEnums.AnimalType;
 import com.lostanimals.animalsInfrastructure.appliedAnimalsEnums.StatusType;
 import com.lostanimals.animalsInfrastructure.model.LostAnimals;
 import com.lostanimals.animalsInfrastructure.model.User;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.*;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.URL;
+import java.sql.Date;
 import java.util.ArrayList;
+import java.util.List;
 
 public class TinderBoltApp extends MultiSessionTelegramBot {
 
     private ChatGPTService chatGPT = new ChatGPTService(Tokens.OPEN_AI_TOKEN);
     private DialogMode dialogMode = null;
-    private UserInfo me;
     private int questionCount;
     private ArrayList<String> messageList = new ArrayList<>();
 
     private User user;
-    private LostAnimals lostAnimal = new LostAnimals(null,null,null,"","",0,null,null,"");
+    private LostAnimals lostAnimal = new LostAnimals(null,null,null,"","",0,null,null,null);
 
 
 
@@ -30,151 +35,187 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
     @Override
     public void onUpdateEventReceived(Update update) throws Exception {
         //TODO: основной функционал бота будем писать здесь
-        var data = update.getMessage();
-        String message = data.getText()==null?"":data.getText();
-        switch(message){
-            case "/start":
-                dialogMode = DialogMode.MAIN;
-                sendPhotoMessage("main");
-                sendTextMessage(loadMessage("main"));
-                showMainMenu(
-                        "Начало","/start",
-                        "Оставить заявку о потере \uD83D\uDE0E","/lost",
-                        "Оставить заявку о нахождении \uD83E\uDD70","/found",
-                        "Посмотреть анкеты найденых \uD83D\uDE08","/found_profiles",
-                        "Мои анкеты \uD83D\uDD25","/my_profiles"
-                );
-                return;
-            case "/lost"://TODO: доработать ветку алгоритма
-                dialogMode = DialogMode.LOST;
-                sendPhotoMessage("found");
-                questionCount = 0;
-                sendHtmlMessage("Укажи свою контактную информацию.\nВаш TG_ID будет приписан анкете автоматически.");
-                sendTextMessage("Укажите телефон по желанию в формате 8xxxxxxxxxx");
+        if (update.hasMessage() && update.getMessage().hasText()) {
+            String message ="";
+            var data = update.getMessage();
+            if(data!=null)
+                message = data.getText()==null?"":data.getText();
+            switch(message){
+                case "/start":
+                    dialogMode = DialogMode.MAIN;
+                    sendPhotoMessage("main");
+                    sendTextMessage(loadMessage("main"));
+                    showMainMenu(
+                            "Начало","/start",
+                            "Оставить заявку о потере ","/lost",
+                            "Оставить заявку о нахождении ","/found",
+                            "Посмотреть анкеты найденых ","/found_profiles",
+                            "Мои анкеты ","/my_profiles"
+                    );
+                    return;
+                case "/lost"://TODO: доработать ветку алгоритма
+                    dialogMode = DialogMode.LOST;
+                    sendPhotoMessage("found");
+                    questionCount = 0;
+                    sendHtmlMessage("Укажи свою контактную информацию.\nВаш TG_ID будет приписан анкете автоматически.");
+                    sendTextMessage("Укажите телефон по желанию в формате 8xxxxxxxxxx");
 
-                //TODO: проверить номер на соответствие форме
-                return;
-            case "/found"://TODO: доработать ветку алгоритма
-                dialogMode = DialogMode.FOUND;
-                sendPhotoMessage("opener");
-                sendTextMessage("Расскажи о девушке, чтобы генеарция была более подходящей");
-                message = getMessageText();
-                return;
-            case "/found_profiles":
-                dialogMode = DialogMode.MOCK;
-                sendPhotoMessage("message");
-                sendTextButtonsMessage("Пришлите в чат переписку",
-                        "Следующее сообщение ","message_next",
-                        "Пригласить на свидание","message_date");
-                sendTextMessage("Пришли в чат свою переписку");
-                message = getMessageText();
-                return;
-            case "/my_profiles":
-                dialogMode = DialogMode.MOCK;
-                sendPhotoMessage("date");
-                sendTextButtonsMessage(loadMessage("date"),
-                        "Ариана Гранде","date_grande",
-                        "Райна Гослинг","date_gosling",
-                        "Марго Робби","date_robbie",
-                        "Зендая","date_zendaya",
-                        "Мистер Хардли","date_hardly");
-                return;
-            default:
-                break;
-        }
+                    //TODO: проверить номер на соответствие форме
+                    return;
+                case "/found"://TODO: доработать ветку алгоритма
+                    dialogMode = DialogMode.FOUND;
+                    return;
+                case "/found_profiles":
+                    dialogMode = DialogMode.MOCK;
+                    return;
+                case "/my_profiles":
+                    dialogMode = DialogMode.MOCK;
+                    return;
+                default:
+                    break;
+            }
 
-        switch(dialogMode){
-            case LOST://TODO: доработать ветку алгоритма
-                String userTgId="";
-                String userNumber="";
+            switch(dialogMode){
+                case LOST://TODO: доработать ветку алгоритма
+                    if(questionCount==0){
+                        String userNumber = message;
+                        String userTgId = String.valueOf(update.getMessage().getFrom().getId());
+                        user = new User(userTgId,userNumber);
+                        sendAnimalTypeKeyboard(update.getMessage().getChatId());
+                        return;
+                    }if(questionCount==1){
+                        sendTextMessage("Введите кличку животного");
+                        int animalsAge = Integer.parseInt(message);
+                        lostAnimal.setAge(animalsAge);
+                        questionCount = 2;
+                        return;
+                    }if(questionCount==2){
+                        sendTextMessage("Введите пол животного");
+                        String animalsName = message;
+                        lostAnimal.setName(animalsName);
+                        questionCount = 3;
+                        return;
+                    }if(questionCount==3){
+                        sendTextMessage("Введите город пропажи");
+                        String animalsSex = message;
+                        lostAnimal.setSex(animalsSex);
+                        questionCount = 4;
+                        return;
+                    }if(questionCount==4){
+                        sendTextMessage("Введите район пропажи");
+                        String animalsCity = message;
+                        lostAnimal.setCity(animalsCity);
+                        questionCount = 5;
+                        return;
+                    }if(questionCount==5){
+                        sendTextMessage("Введите приметы животного в свободной форме");
 
-                String animalsType="";
-                String animalsName="";
-                String animalsSex="";
-                int animalsAge=0;
-                String animalsCity="";
-                String animalsDistrict="";
-                StatusType animalsStatus;
-                String animalsDescription="";
+                        String animalsDistrict = message;
+                        lostAnimal.setDistrict(animalsDistrict);
 
-                userTgId = String.valueOf(update.getMessage().getFrom().getId());
-                if(questionCount==0){
-                    userNumber = message;
-                    questionCount = 1;
-                    user = new User(userTgId,userNumber);
-                    sendTextMessage("Введите вид животного");
-                    return;
-                }
-                if(questionCount==1){
-                    sendTextMessage("Сколько лет животному");
-                    animalsType = message;
-                    lostAnimal.setType(animalsType);
-                    questionCount = 2;
-                    return;
-                }if(questionCount==2){
-                    sendTextMessage("Введите кличку животного");
-                    animalsAge= Integer.parseInt(message);
-                    lostAnimal.setAge(animalsAge);
-                    questionCount = 3;
-                    return;
-                }if(questionCount==3){
-                    sendTextMessage("Введите пол животного");
-                    animalsName = message;
-                    lostAnimal.setName(animalsName);
-                    questionCount = 4;
-                    return;
-                }if(questionCount==4){
-                    sendTextMessage("Введите город пропажи");
-                    animalsSex = message;
-                    lostAnimal.setSex(animalsSex);
-                    questionCount = 5;
-                    return;
-                }if(questionCount==5){
-                    sendTextMessage("Введите район пропажи");
-                    animalsCity = message;
-                    lostAnimal.setCity(animalsCity);
-                    questionCount = 6;
-                    return;
-                }if(questionCount==6){
-                    sendTextMessage("Введите приметы животного в свободной форме");
+                        StatusType animalsStatus = StatusType.LOST;
+                        lostAnimal.setStatus(animalsStatus);
 
-                    animalsDistrict = message;
-                    lostAnimal.setDistrict(animalsDistrict);
-
-                    animalsStatus = StatusType.LOST;
-                    lostAnimal.setStatus(animalsStatus);
-
-                    questionCount = 7;
-                    return;
-                }if(questionCount==7){
-                    sendTextMessage("Прикрепите фото животного");
-                    animalsDescription = message;
-                    lostAnimal.setDescription(animalsDescription);
-                    questionCount = 8;
-                    return;
-                }if(questionCount==8) {
-                    sendTextMessage("Это финальный пункт");
-                    String fileId = update.getMessage().getPhoto().get(0).getFileId();
-                    File file = execute(new org.telegram.telegrambots.meta.api.methods.GetFile(fileId));
-                    String filePath = file.getFilePath();
-                    byte[] photo = downloadNewFile(filePath);
-                    lostAnimal.setImageData(photo);
-                    if (user.getLostAnimals() == null) {
-                        user.setLostAnimals(new ArrayList<>());
+                        questionCount = 6;
+                        return;
+                    }if(questionCount==6){
+                        sendTextMessage("Введите дату в формате гггг-мм-дд");
+                        String animalsDescription = message;
+                        lostAnimal.setDescription(animalsDescription);
+                        questionCount = 7;
+                        return;
+                    }if(questionCount==7){
+                        String dateStr = message;
+                        String[] arr = message.split("-");
+                        if(arr.length<3){
+                            sendTextMessage("Невалидная дата. Введите дату в формате гггг-мм-дд.");
+                            return;
+                        }
+                        int year = Integer.parseInt(arr[0]);
+                        int month = Integer.parseInt(arr[1]);
+                        int day = Integer.parseInt(arr[2]);
+                        java.sql.Date date = new java.sql.Date(year,month,day);
+                        lostAnimal.setDate(date);
+                        questionCount = 8;
+                        sendTextMessage("Прикрепите фото животного");
+                        return;
                     }
-                    user.addLostAnimals(lostAnimal);
-                    questionCount = 9;
+                    break;
+                case FOUND://TODO: доработать ветку алгоритма
+                    break;
+                default:
+                    break;
+            }
+        }else if (update.hasCallbackQuery()) {
+            String animalsType = update.getCallbackQuery().getData();
+            boolean isReady = false;
+            switch (animalsType) {
+                case "Кошка":
+                    lostAnimal.setType(AnimalType.CAT);
+                    isReady = true;
+                    break;
+                case "Собака":
+                    lostAnimal.setType(AnimalType.DOG);
+                    isReady = true;
+                    break;
+                case "Птица":
+                    lostAnimal.setType(AnimalType.PARROT);
+                    isReady = true;
+                    break;
+                default:
+                    // Если тип животного не распознан, отправляем сообщение об ошибке
+                    sendTextMessage("Введены невалидные данные, выберите пункт кнопки заново");
+                    sendAnimalTypeKeyboard(update.getMessage().getChatId());
                     return;
+            }
+            if (isReady) {
+                sendTextMessage("Вы выбрали: " + animalsType);
+                sendTextMessage("Сколько лет животному");
+                questionCount = 1; // Переход к следующему вопросу
+            }
+        }else if (update.hasMessage()) {
+            if(questionCount==8) {
+                sendTextMessage("Это финальный пункт");
+                String fileId = update.getMessage().getPhoto().get(0).getFileId();
+                File file = execute(new org.telegram.telegrambots.meta.api.methods.GetFile(fileId));
+                String filePath = file.getFilePath();
+                byte[] photo = downloadNewFile(filePath);
+                lostAnimal.setImageData(photo);
+                if (user.getLostAnimals() == null) {
+                    user.setLostAnimals(new ArrayList<>());
                 }
-                break;
-            case FOUND://TODO: доработать ветку алгоритма
-                break;
-            default:
-                break;
+                user.addLostAnimals(lostAnimal);
+                questionCount = 9;
+                return;
+            }
+            update.getMessage().getPhoto().get(0);
+
         }
-
     }
+    private void sendAnimalTypeKeyboard(Long chatId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> buttons = new ArrayList<>();
 
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        row.add(InlineKeyboardButton.builder().text("Кошка").callbackData("Кошка").build());
+        row.add(InlineKeyboardButton.builder().text("Собака").callbackData("Собака").build());
+        row.add(InlineKeyboardButton.builder().text("Птица").callbackData("Птица").build());
+        buttons.add(row);
+
+        markup.setKeyboard(buttons);
+        sendMessageWithKeyboard(chatId, "Выберите вид животного:", markup);
+    }
+    private void sendMessageWithKeyboard(Long chatId, String text, InlineKeyboardMarkup markup) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText(text);
+        message.setReplyMarkup(markup);
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
     private byte[] downloadNewFile(String filePath) throws Exception {
         // Формируем URL для скачивания файла
         String fileUrl = "https://api.telegram.org/file/bot" + getBotToken() + "/" + filePath;
