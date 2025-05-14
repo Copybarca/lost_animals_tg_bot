@@ -16,4 +16,7 @@ public class UserService {
     public User getUserByTgID(String tgId) {
         return userRepository.findByTgId(tgId);
     }
+    public void saveUser(User user) {
+        userRepository.save(user);
+    }
 }

@@ -4,12 +4,17 @@ import com.lostanimals.animalsInfrastructure.appliedAnimalsEnums.AnimalType;
 import com.lostanimals.animalsInfrastructure.appliedAnimalsEnums.StatusType;
 import com.lostanimals.animalsInfrastructure.model.LostAnimals;
 import com.lostanimals.animalsInfrastructure.model.User;
+import com.lostanimals.animalsInfrastructure.service.UserService;
+import org.springframework.context.ApplicationContext;
+import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.URL;
@@ -19,18 +24,19 @@ import java.util.List;
 
 public class TinderBoltApp extends MultiSessionTelegramBot {
 
-    private ChatGPTService chatGPT = new ChatGPTService(Tokens.OPEN_AI_TOKEN);
     private DialogMode dialogMode = null;
     private int questionCount;
-    private ArrayList<String> messageList = new ArrayList<>();
+    private final ApplicationContext applicationContext;
+    private final UserService userService;
+    private final User user;
+    private final LostAnimals lostAnimal;
 
-    private User user;
-    private LostAnimals lostAnimal = new LostAnimals(null,null,null,"","",0,null,null,null);
-
-
-
-    public TinderBoltApp() {
+    public TinderBoltApp(ApplicationContext applicationContext) {
         super(Tokens.TELEGRAM_BOT_NAME, Tokens.TELEGRAM_BOT_TOKEN);
+        this.applicationContext=applicationContext;
+        this.userService = applicationContext.getBean(UserService.class);
+        this.user = applicationContext.getBean(User.class);
+        this.lostAnimal = applicationContext.getBean(LostAnimals.class);
     }
     @Override
     public void onUpdateEventReceived(Update update) throws Exception {
@@ -76,11 +82,11 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
             }
 
             switch(dialogMode){
-                case LOST://TODO: доработать ветку алгоритма
+                case LOST:
                     if(questionCount==0){
-                        String userNumber = message;
                         String userTgId = String.valueOf(update.getMessage().getFrom().getId());
-                        user = new User(userTgId,userNumber);
+                        user.setTgId(userTgId);
+                        user.setPhoneNumber(message);
                         sendAnimalTypeKeyboard(update.getMessage().getChatId());
                         return;
                     }if(questionCount==1){
@@ -89,29 +95,25 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                         lostAnimal.setAge(animalsAge);
                         questionCount = 2;
                         return;
-                    }if(questionCount==2){
+                    }if(questionCount==2){//TODO: сделать енам на выбор пола и кнопку добавить - она в калбек квери на else if Будет обрабатываться
                         sendTextMessage("Введите пол животного");
-                        String animalsName = message;
-                        lostAnimal.setName(animalsName);
+                        lostAnimal.setName(message);
                         questionCount = 3;
                         return;
                     }if(questionCount==3){
                         sendTextMessage("Введите город пропажи");
-                        String animalsSex = message;
-                        lostAnimal.setSex(animalsSex);
+                        lostAnimal.setSex(message);
                         questionCount = 4;
                         return;
                     }if(questionCount==4){
                         sendTextMessage("Введите район пропажи");
-                        String animalsCity = message;
-                        lostAnimal.setCity(animalsCity);
+                        lostAnimal.setCity(message);
                         questionCount = 5;
                         return;
                     }if(questionCount==5){
                         sendTextMessage("Введите приметы животного в свободной форме");
 
-                        String animalsDistrict = message;
-                        lostAnimal.setDistrict(animalsDistrict);
+                        lostAnimal.setDistrict(message);
 
                         StatusType animalsStatus = StatusType.LOST;
                         lostAnimal.setStatus(animalsStatus);
@@ -120,24 +122,25 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                         return;
                     }if(questionCount==6){
                         sendTextMessage("Введите дату в формате гггг-мм-дд");
-                        String animalsDescription = message;
-                        lostAnimal.setDescription(animalsDescription);
+                        lostAnimal.setDescription(message);
                         questionCount = 7;
                         return;
                     }if(questionCount==7){
-                        String dateStr = message;
                         String[] arr = message.split("-");
                         if(arr.length<3){
                             sendTextMessage("Невалидная дата. Введите дату в формате гггг-мм-дд.");
                             return;
                         }
-                        int year = Integer.parseInt(arr[0]);
-                        int month = Integer.parseInt(arr[1]);
-                        int day = Integer.parseInt(arr[2]);
-                        java.sql.Date date = new java.sql.Date(year,month,day);
-                        lostAnimal.setDate(date);
-                        questionCount = 8;
-                        sendTextMessage("Прикрепите фото животного");
+                        java.sql.Date date;
+                        try{
+                            date = Date.valueOf(message);
+                            lostAnimal.setDate(date);
+                            questionCount = 8;
+                            sendTextMessage("Прикрепите фото животного как ФАЙЛ БЕЗ СЖАТИЯ.\n Размер фото до 1МБ включительно.");
+                        }catch (IllegalArgumentException e){
+                            e.printStackTrace();//TODO: тут можно добавить сервис для логирования потом
+                            sendTextMessage("Невалидная дата. Введите дату в формате гггг-мм-дд.");
+                        }
                         return;
                     }
                     break;
@@ -175,8 +178,17 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
             }
         }else if (update.hasMessage()) {
             if(questionCount==8) {
-                sendTextMessage("Это финальный пункт");
-                String fileId = update.getMessage().getPhoto().get(0).getFileId();
+                //String fileId = update.getMessage().getPhoto().get(0).getFileId();
+                if(update.getMessage().getDocument()==null){
+                    sendTextMessage("Файл должен быть БЕЗ СЖАТИЯ.");
+                    return;
+                }
+                if(update.getMessage().getDocument().getFileSize()> 1_048_576){
+                    sendTextMessage("Размер файла "+update.getMessage().getDocument().getFileSize() +"\n файл слишком велик." +
+                            "загрузите новое изоюражение.");
+                    return;
+                }
+                String fileId = update.getMessage().getDocument().getFileId();
                 File file = execute(new org.telegram.telegrambots.meta.api.methods.GetFile(fileId));
                 String filePath = file.getFilePath();
                 byte[] photo = downloadNewFile(filePath);
@@ -185,10 +197,15 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                     user.setLostAnimals(new ArrayList<>());
                 }
                 user.addLostAnimals(lostAnimal);
+                lostAnimal.setUser(user);
+                userService.saveUser(user);
                 questionCount = 9;
+                sendTextMessage("Это финальный пункт.\nВот ваша анкета: ");
+                //sendPhotoAsFile(lostAnimal.getImageData(),update.getMessage().getChatId());
+                sendPhotoMessageFromByteArray(lostAnimal.getImageData(),update.getMessage().getChatId());
+                sendHtmlMessage(""+user+ lostAnimal);
                 return;
             }
-            update.getMessage().getPhoto().get(0);
 
         }
     }
@@ -221,13 +238,45 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
         String fileUrl = "https://api.telegram.org/file/bot" + getBotToken() + "/" + filePath;
 
         try (InputStream in = new URL(fileUrl).openStream();
-             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[1024];
             int bytesRead;
             while ((bytesRead = in.read(buffer)) != -1) {
                 baos.write(buffer, 0, bytesRead);
             }
+            System.out.println(baos.size());
             return baos.toByteArray(); // Возвращаем массив байтов
+        }
+    }
+    public void sendPhotoMessageFromByteArray(byte[] imageData,Long chatID) {
+        // Преобразуем массив байтов в InputStream
+        InputStream inputStream = new ByteArrayInputStream(imageData);
+
+        // Отправляем фото
+        try {
+            // Используйте метод sendPhoto из вашей библиотеки Telegram
+            SendPhoto sendPhoto = new SendPhoto();
+            sendPhoto.setChatId(chatID); // Установите ID чата, куда отправляется фото
+            sendPhoto.setPhoto(new InputFile(inputStream, "image.jpg")); // Укажите имя файла
+
+            // Отправка сообщения
+            execute(sendPhoto);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    public void sendPhotoAsFile(byte[] imageData, Long chatID) {
+        InputStream inputStream = new ByteArrayInputStream(imageData);
+
+        try {
+            SendDocument sendDocument = new SendDocument();
+            sendDocument.setChatId(chatID); // Установите ID чата, куда отправляется фото
+            sendDocument.setDocument(new InputFile(inputStream, "image.jpg")); // Укажите имя файла
+
+            // Отправка сообщения
+            execute(sendDocument);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
    /* public static void main(String[] args) throws TelegramApiException {

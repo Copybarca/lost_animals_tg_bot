@@ -1,19 +1,20 @@
 package com.lostanimals.animalsInfrastructure.model;
 
 import jakarta.persistence.*;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Set;
 
 @Entity
 @Table(name = "users")
+@Component
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String tgId;
     private String phoneNumber;
-    @OneToMany(mappedBy = "master", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<LostAnimals> lostAnimals; // Связь с потерянными животными
 
     public User(String tgId, String phoneNumber) {
@@ -50,5 +51,9 @@ public class User {
     }
     public void addLostAnimals(LostAnimals lostAnimals) {
         this.lostAnimals.add(lostAnimals);
+    }
+    @Override
+    public String toString() {
+        return "Ваш TG_ID: " + tgId + "\n Телефон, который вы оставили: " + phoneNumber+".\n";
     }
 }

@@ -3,11 +3,14 @@ package com.lostanimals.animalsInfrastructure.model;
 import com.lostanimals.animalsInfrastructure.appliedAnimalsEnums.AnimalType;
 import com.lostanimals.animalsInfrastructure.appliedAnimalsEnums.StatusType;
 import jakarta.persistence.*;
+import org.springframework.stereotype.Component;
 
 import java.sql.Date;
+import java.util.Arrays;
 
 @Entity
 @Table(name = "lost_animals")
+@Component
 public class LostAnimals {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -47,10 +50,10 @@ public class LostAnimals {
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false) // Внешний ключ
-    private User master;
+    private User user;
 
-    public LostAnimals(User master, String description, StatusType status, String district, String city, Integer age, String sex, String name, AnimalType type) {
-        this.master = master;
+    public LostAnimals(User user, String description, StatusType status, String district, String city, Integer age, String sex, String name, AnimalType type) {
+        this.user = user;
         this.description = description;
         this.status = status;
         this.district = district;
@@ -107,8 +110,8 @@ public class LostAnimals {
         this.description = description;
     }
 
-    public void setMaster(User master) {
-        this.master = master;
+    public void setUser(User master) {
+        this.user = master;
     }
 
     public Long getId() {
@@ -147,8 +150,8 @@ public class LostAnimals {
         return description;
     }
 
-    public User getMaster() {
-        return master;
+    public User getUser() {
+        return user;
     }
 
     public byte[] getImageData() {
@@ -157,5 +160,19 @@ public class LostAnimals {
 
     public void setImageData(byte[] imageData) {
         this.imageData = imageData;
+    }
+
+    @Override
+    public String toString() {
+        return "Ваше животное: " +
+                "\nТип: " + type +
+                "\nИмя: " + name + '\'' +
+                "\nПол: " + sex + '\'' +
+                "\nВозраст: " + age +
+                "\nГород: " + city + '\'' +
+                "\nРайон: " + district + '\'' +
+                "\nСтатус: " + status +
+                "\nОписание: " + description + '\'' +
+                "\nДата: " + date+".\n";
     }
 }
