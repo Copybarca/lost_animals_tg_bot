@@ -1,6 +1,7 @@
 package com.lostanimals.animalsInfrastructure.model;
 
 import com.lostanimals.animalsInfrastructure.appliedAnimalsEnums.AnimalType;
+import com.lostanimals.animalsInfrastructure.appliedAnimalsEnums.SexType;
 import com.lostanimals.animalsInfrastructure.appliedAnimalsEnums.StatusType;
 import jakarta.persistence.*;
 import org.springframework.stereotype.Component;
@@ -17,26 +18,27 @@ public class LostAnimals {
     private Long id; // Уникальный идентификатор
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "type", nullable = false)
+    @Column(name = "type")
     private AnimalType type; // Тип животного (например, собака, кошка и т.д.)
 
-    @Column(name = "name", nullable = false)
+    @Column(name = "name")
     private String name; // Имя животного
 
-    @Column(name = "sex", nullable = false)
-    private String sex; // Пол животного (например, мужской, женский)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sex")
+    private SexType sex; // Пол животного (например, мужской, женский)
 
     @Column(name = "age")
     private Integer age; // Возраст животного
 
-    @Column(name = "city", nullable = false)
+    @Column(name = "city")
     private String city; // Город, где пропало животное
 
     @Column(name = "district")
     private String district; // Район, где пропало животное
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status")
     private StatusType status; // Статус (например, найдено, пропало)
 
     @Column(name = "description")
@@ -52,7 +54,7 @@ public class LostAnimals {
     @JoinColumn(name = "user_id", nullable = false) // Внешний ключ
     private User user;
 
-    public LostAnimals(User user, String description, StatusType status, String district, String city, Integer age, String sex, String name, AnimalType type) {
+    public LostAnimals(User user, String description, StatusType status, String district, String city, Integer age, SexType sex, String name, AnimalType type) {
         this.user = user;
         this.description = description;
         this.status = status;
@@ -86,7 +88,7 @@ public class LostAnimals {
         this.name = name;
     }
 
-    public void setSex(String sex) {
+    public void setSex(SexType sex) {
         this.sex = sex;
     }
 
@@ -126,7 +128,7 @@ public class LostAnimals {
         return name;
     }
 
-    public String getSex() {
+    public SexType getSex() {
         return sex;
     }
 
@@ -165,6 +167,18 @@ public class LostAnimals {
     @Override
     public String toString() {
         return "Ваше животное: " +
+                "\nТип: " + type +
+                "\nИмя: " + name + '\'' +
+                "\nПол: " + sex + '\'' +
+                "\nВозраст: " + age +
+                "\nГород: " + city + '\'' +
+                "\nРайон: " + district + '\'' +
+                "\nСтатус: " + status +
+                "\nОписание: " + description + '\'' +
+                "\nДата: " + date+".\n";
+    }
+    public String toStringForFoundOrLostPage() {
+        return "Животное: " +
                 "\nТип: " + type +
                 "\nИмя: " + name + '\'' +
                 "\nПол: " + sex + '\'' +

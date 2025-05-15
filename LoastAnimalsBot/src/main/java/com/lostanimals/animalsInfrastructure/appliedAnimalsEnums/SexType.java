@@ -1,8 +1,5 @@
 package com.lostanimals.animalsInfrastructure.appliedAnimalsEnums;
 
-public enum AnimalType {
-    DOG,
-    CAT,
-    PARROT;
-
+public enum SexType {
+    MALE, FEMALE
 }
