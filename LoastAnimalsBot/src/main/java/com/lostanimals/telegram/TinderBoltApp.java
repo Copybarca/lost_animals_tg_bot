@@ -103,12 +103,13 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                     }else if(currentUser.getLostAnimals()==null){
                         sendTextMessage("Похоже, у вас пока нет анкет");
                     }else{
-                        List<LostAnimals> lostAnimalsByCurrentUserList = currentUser.getLostAnimals();
+                        List<LostAnimals> lostAnimalsByCurrentUserList = lostAnimalsService.getAllByUser(currentUser);
                         for(LostAnimals lostAnimal : lostAnimalsByCurrentUserList){
                             sendPhotoMessageFromByteArray(lostAnimal.getImageData(),update.getMessage().getChatId());
                             sendHtmlMessage(lostAnimal.toString());
                         }
                     }
+                    sendProfilesCommandKeyboard(update.getMessage().getChatId());
                     return;
                 default:
                     break;
@@ -191,6 +192,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                     sendNextSwitcherKeyboard(update.getMessage().getChatId());
                     return;
                 case SEE_MY:
+                    sendProfilesCommandKeyboard(update.getMessage().getChatId());
                     return;
                 default:
                     break;
@@ -208,7 +210,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                     if(questionCount==0){
                         handleAnimalTypeKeyboard(update,"Введите город нахождения");
                     }else if(questionCount==2){
-                        handleAnimalSexKeyboard(update,"Введите нахождения животного в формате гггг-мм-дд");
+                        handleAnimalSexKeyboard(update,"Введите дату нахождения животного в формате гггг-мм-дд");
                     }
                     return;
                 case SEE_LOST:
@@ -218,6 +220,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                     handleUserResponseToShowAnimalsByStatus(update,StatusType.FOUND);
                     return;
                 case SEE_MY:
+                    handleProfilesCommandKeyboard(update,"");
                     return;
                 default:
                     break;
@@ -227,13 +230,17 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                 case LOST:
                     if(questionCount==7) {
                         //String fileId = update.getMessage().getPhoto().get(0).getFileId();
-                        handleUserSendDocument(update,"Это финальный пункт.\nВот ваша анкета: ");
-                        if (user.getLostAnimals() == null) {
-                            user.setLostAnimals(new ArrayList<>());
+                        if(userService.getUserByTgID(user.getTgId())!=null){
+                            lostAnimalsService.addAnimalForUser(user,lostAnimal);
+                        }else{
+                            handleUserSendDocument(update,"Это финальный пункт.\nВот ваша анкета: ");
+                            if (user.getLostAnimals() == null) {
+                                user.setLostAnimals(new ArrayList<>());
+                            }
+                            user.addLostAnimals(lostAnimal);
+                            lostAnimal.setUser(user);
+                            userService.saveUser(user);
                         }
-                        user.addLostAnimals(lostAnimal);
-                        lostAnimal.setUser(user);
-                        userService.saveUser(user);
                         sendPhotoMessageFromByteArray(lostAnimal.getImageData(),update.getMessage().getChatId());
                         sendHtmlMessage(""+user+ lostAnimal);
                         return;
@@ -241,12 +248,16 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                 case FOUND:
                     if(questionCount==4){
                         handleUserSendDocument(update,"Это финальный пункт.\nВот ваша анкета: ");
-                        if (user.getLostAnimals() == null) {
-                            user.setLostAnimals(new ArrayList<>());
+                        if(userService.getUserByTgID(user.getTgId())!=null){
+                            lostAnimalsService.addAnimalForUser(user,lostAnimal);
+                        }else{
+                            if (user.getLostAnimals() == null) {
+                                user.setLostAnimals(new ArrayList<>());
+                            }
+                            user.addLostAnimals(lostAnimal);
+                            lostAnimal.setUser(user);
+                            userService.saveUser(user);
                         }
-                        user.addLostAnimals(lostAnimal);
-                        lostAnimal.setUser(user);
-                        userService.saveUser(user);
                         sendPhotoMessageFromByteArray(lostAnimal.getImageData(),update.getMessage().getChatId());
                         sendHtmlMessage(""+user+ lostAnimal);
                         return;
@@ -384,6 +395,60 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
 
         markup.setKeyboard(buttons);
         sendMessageWithKeyboard(chatId, "Выберите пол животного:", markup);
+    }
+    private void handleProfilesCommandKeyboard(Update update,String nextMessage){
+        String stringCommand = update.getCallbackQuery().getData();
+        sendTextMessage("Вы выбрали: " + stringCommand);
+        switch (stringCommand) {
+            case "Удалить все анкеты":
+                User userToDelete = userService.getUserByTgID(update.getMessage().getFrom().getUserName());
+                lostAnimalsService.deleteLostAnimalsByUser(userToDelete);
+                break;
+            case "Создать новую анкету о потере":
+                Message messageLost = new Message();
+                messageLost.setText("/lost");
+                Update updateLost = new Update();
+                updateLost.setMessage(messageLost);
+                try {
+                    onUpdateEventReceived(updateLost);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+                break;
+            case "Создать новую анкету о нахождении":
+                Message messageFound = new Message();
+                messageFound.setText("/found");
+                Update updateFound = new Update();
+                updateFound.setMessage(messageFound);
+                try {
+                    onUpdateEventReceived(updateFound);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+                break;
+            default:
+                sendTextMessage("Введены невалидные данные, выберите пункт кнопки заново или отправьте валидные запросы из пункта меню.");
+                sendAnimalTypeKeyboard(update.getMessage().getChatId());
+                return;
+        }
+        sendTextMessage(nextMessage);
+        this.questionCount += 1; // Переход к следующему вопросу
+    }
+    private void sendProfilesCommandKeyboard(Long chatId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> buttons = new ArrayList<>();
+
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        row.add(InlineKeyboardButton.builder().text("Удалить все анкеты").callbackData("Удалить все анкеты").build());
+        buttons.add(row);
+        row = new ArrayList<>();
+        row.add(InlineKeyboardButton.builder().text("Создать новую анкету о потере").callbackData("Создать новую анкету о потере").build());
+        buttons.add(row);
+        row = new ArrayList<>();
+        row.add(InlineKeyboardButton.builder().text("Создать новую анкету о нахождении").callbackData("Создать новую анкету о нахождении").build());
+        buttons.add(row);
+        markup.setKeyboard(buttons);
+        sendMessageWithKeyboard(chatId, "Выберите желаемое действие:", markup);
     }
     private void sendAnimalTypeKeyboard(Long chatId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();

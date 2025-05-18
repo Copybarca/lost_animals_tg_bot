@@ -2,6 +2,7 @@ package com.lostanimals.animalsInfrastructure.model;
 
 import jakarta.persistence.*;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -12,6 +13,7 @@ public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @Column(name = "tg_id",unique = true)
     private String tgId;
     private String phoneNumber;
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
@@ -43,12 +45,14 @@ public class User {
     public String getPhoneNumber() {
         return phoneNumber;
     }
+    @Transactional
     public List<LostAnimals> getLostAnimals() {
         return lostAnimals;
     }
     public void setLostAnimals(List<LostAnimals> lostAnimals) {
         this.lostAnimals = lostAnimals;
-    }
+    }                                                                                 
+
     public void addLostAnimals(LostAnimals lostAnimals) {
         this.lostAnimals.add(lostAnimals);
     }
