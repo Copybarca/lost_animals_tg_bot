@@ -20,6 +20,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.URL;
 import java.sql.Date;
@@ -58,8 +59,8 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
             switch(message){// -- Начало меню выбора режима диалога --
                 case "/start":
                     dialogMode = DialogMode.MAIN;
-                    sendPhotoMessage("main");
-                    sendHtmlMessage(loadMessage("main"));
+                    sendPhoto("main",update.getMessage().getChatId());
+                    sendHtmlMessage(getMessagesText("main"));
                     showMainMenu(
                             "Начало","/start",
                             "Оставить заявку о потере ","/lost",
@@ -71,7 +72,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                     return;
                 case "/lost"://TODO: доработать ветку алгоритма
                     dialogMode = DialogMode.LOST;
-                    sendPhotoMessage("lost");
+                    sendPhoto("lost",update.getMessage().getChatId());
                     questionCount = 0;
                     sendHtmlMessage("Вы можете составить анкету о пропаже вашего животного. Укажите свою контактную информацию.\nВаш TG_ID будет приписан анкете автоматически.");
                     sendTextMessage("Укажите телефон по желанию в формате 8xxxxxxxxxx");
@@ -80,7 +81,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                     return;
                 case "/found"://TODO: доработать ветку алгоритма
                     dialogMode = DialogMode.FOUND;
-                    sendPhotoMessage("found");
+                    sendPhoto("found",update.getMessage().getChatId());
                     questionCount = 0;
                     sendHtmlMessage("Вы можете оставить заявку о том, что нашли животное, вероятно потерянное. Укажите свою контактную информацию.\nВаш TG_ID будет приписан анкете автоматически.");
                     sendTextMessage("Укажите телефон по желанию в формате 8xxxxxxxxxx");
@@ -399,6 +400,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
     private void handleProfilesCommandKeyboard(Update update,String nextMessage){
         String stringCommand = update.getCallbackQuery().getData();
         sendTextMessage("Вы выбрали: " + stringCommand);
+        Chat chat = new Chat(update.getCallbackQuery().getMessage().getChatId(),"user");
         switch (stringCommand) {
             case "Удалить все анкеты":
                 User userToDelete = userService.getUserByTgID(update.getMessage().getFrom().getUserName());
@@ -407,6 +409,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
             case "Создать новую анкету о потере":
                 Message messageLost = new Message();
                 messageLost.setText("/lost");
+                messageLost.setChat(chat);
                 Update updateLost = new Update();
                 updateLost.setMessage(messageLost);
                 try {
@@ -418,6 +421,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
             case "Создать новую анкету о нахождении":
                 Message messageFound = new Message();
                 messageFound.setText("/found");
+                messageFound.setChat(chat);
                 Update updateFound = new Update();
                 updateFound.setMessage(messageFound);
                 try {
@@ -501,16 +505,11 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
         }
     }
     public void sendPhotoMessageFromByteArray(byte[] imageData,Long chatID) {
-        // Преобразуем массив байтов в InputStream
-        InputStream inputStream = new ByteArrayInputStream(imageData);
-
-        // Отправляем фото
-        try {
+        try (InputStream inputStream = new ByteArrayInputStream(imageData);){
             // Используйте метод sendPhoto из вашей библиотеки Telegram
             SendPhoto sendPhoto = new SendPhoto();
             sendPhoto.setChatId(chatID); // Установите ID чата, куда отправляется фото
             sendPhoto.setPhoto(new InputFile(inputStream, "image.jpg")); // Укажите имя файла
-
             // Отправка сообщения
             execute(sendPhoto);
         } catch (Exception e) {
@@ -535,18 +534,44 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
         }
     }
     public void sendPhotoAsFile(byte[] imageData, Long chatID) {
-        InputStream inputStream = new ByteArrayInputStream(imageData);
-
-        try {
+        try(InputStream inputStream = new ByteArrayInputStream(imageData);) {
             SendDocument sendDocument = new SendDocument();
             sendDocument.setChatId(chatID); // Установите ID чата, куда отправляется фото
             sendDocument.setDocument(new InputFile(inputStream, "image.jpg")); // Укажите имя файла
-
             // Отправка сообщения
             execute(sendDocument);
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+    public void sendPhoto(String name,Long chatId) {
+        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("images/"+name+".jpg");
+             ByteArrayOutputStream baos = new ByteArrayOutputStream()){
+             byte[] buffer = new byte[1024];
+             int bytesRead;
+             while ((bytesRead = inputStream.read(buffer)) != -1) {
+                 baos.write(buffer, 0, bytesRead);
+             }
+             sendPhotoMessageFromByteArray(baos.toByteArray(),chatId);
+             System.out.println(baos.size());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    public String getMessagesText(String name) {
+        String str = "";
+        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("messages/"+name+".txt");
+             ByteArrayOutputStream baos = new ByteArrayOutputStream()){
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                baos.write(buffer, 0, bytesRead);
+            }
+            str = baos.toString();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return str;
     }
    /* public static void main(String[] args) throws TelegramApiException {
         TelegramBotsApi telegramBotsApi = new TelegramBotsApi(DefaultBotSession.class);
