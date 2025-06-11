@@ -10,6 +10,7 @@ import com.lostanimals.animalsInfrastructure.service.UserService;
 import org.springframework.context.ApplicationContext;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Controller;
 import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
@@ -26,7 +27,7 @@ import java.net.URL;
 import java.sql.Date;
 import java.util.ArrayList;
 import java.util.List;
-
+@Controller
 public class TinderBoltApp extends MultiSessionTelegramBot {
 
     private DialogMode dialogMode = null;
@@ -231,10 +232,10 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                 case LOST:
                     if(questionCount==7) {
                         //String fileId = update.getMessage().getPhoto().get(0).getFileId();
+                        handleUserSendDocument(update,"Это финальный пункт.\nВот ваша анкета: ");
                         if(userService.getUserByTgID(user.getTgId())!=null){
                             lostAnimalsService.addAnimalForUser(user,lostAnimal);
                         }else{
-                            handleUserSendDocument(update,"Это финальный пункт.\nВот ваша анкета: ");
                             if (user.getLostAnimals() == null) {
                                 user.setLostAnimals(new ArrayList<>());
                             }
