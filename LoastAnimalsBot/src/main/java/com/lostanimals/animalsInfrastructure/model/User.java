@@ -15,6 +15,7 @@ public class User {
     private Long id;
     @Column(name = "tg_id",unique = true)
     private String tgId;
+    @Column(name = "phone_number")
     private String phoneNumber;
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<LostAnimals> lostAnimals; // Связь с потерянными животными
@@ -45,7 +46,7 @@ public class User {
     public String getPhoneNumber() {
         return phoneNumber;
     }
-    @Transactional
+    //@Transactional
     public List<LostAnimals> getLostAnimals() {
         return lostAnimals;
     }
