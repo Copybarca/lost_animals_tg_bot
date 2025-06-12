@@ -17,7 +17,6 @@ public class LostAnimalsApplication {
 
     public static void main(String[] args)throws TelegramApiException {
         ApplicationContext applicationContext = SpringApplication.run(LostAnimalsApplication.class, args);
-        TelegramBotsApi telegramBotsApi = new TelegramBotsApi(DefaultBotSession.class);
-        telegramBotsApi.registerBot(new TinderBoltApp(applicationContext));
+
     }
 }

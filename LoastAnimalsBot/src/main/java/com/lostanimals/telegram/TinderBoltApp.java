@@ -3,14 +3,14 @@ package com.lostanimals.telegram;
 import com.lostanimals.animalsInfrastructure.appliedAnimalsEnums.AnimalType;
 import com.lostanimals.animalsInfrastructure.appliedAnimalsEnums.SexType;
 import com.lostanimals.animalsInfrastructure.appliedAnimalsEnums.StatusType;
-import com.lostanimals.animalsInfrastructure.model.LostAnimals;
+import com.lostanimals.animalsInfrastructure.model.LostAnimal;
 import com.lostanimals.animalsInfrastructure.model.User;
+import com.lostanimals.animalsInfrastructure.model.UserSession;
 import com.lostanimals.animalsInfrastructure.service.LostAnimalsService;
 import com.lostanimals.animalsInfrastructure.service.UserService;
 import org.springframework.context.ApplicationContext;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.stereotype.Controller;
 import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
@@ -21,38 +21,50 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.URL;
 import java.sql.Date;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
-@Controller
-public class TinderBoltApp extends MultiSessionTelegramBot {
+import java.util.concurrent.ConcurrentHashMap;
 
-    private DialogMode dialogMode = null;
-    private int questionCount;
-    private final ApplicationContext applicationContext;
+public class TinderBoltApp extends MultiSessionTelegramBot {
 
     private final UserService userService;
     private final LostAnimalsService lostAnimalsService;
-    private final User user;
-    private final LostAnimals lostAnimal;
-    private  List<LostAnimals> lostAnimalsList;
-    private int currentNumberOfAnimal = 0;
-    private int page =0;
+
+    private DialogMode dialogMode = null;// TODO: обезпасить в многопоточке
+    //private final User user;// TODO: обезпасить в многопоточке
+    //private final LostAnimal lostAnimal;// TODO: обезпасить в многопоточке
+    private int questionCount;// TODO: обезпасить в многопоточке
+    private  List<LostAnimal> lostAnimalList;// TODO: обезпасить в многопоточке
+    private int currentNumberOfAnimal = 0; // TODO: обезпасить в многопоточке
+    private int page =0; // TODO: обезпасить в многопоточке
+    private  UserSession userSession;
+    private final ApplicationContext applicationContext;
+    private AbstractMap<Long, UserSession> userSessions;
+
     public TinderBoltApp(ApplicationContext applicationContext) {
         super(Tokens.TELEGRAM_BOT_NAME, Tokens.TELEGRAM_BOT_TOKEN);
         this.applicationContext=applicationContext;
         this.userService = applicationContext.getBean(UserService.class);
-        this.user = applicationContext.getBean(User.class);
-        this.lostAnimal = applicationContext.getBean(LostAnimals.class);
+        //this.user = applicationContext.getBean(User.class);
+        //this.lostAnimal = applicationContext.getBean(LostAnimal.class);
         this.lostAnimalsService = applicationContext.getBean(LostAnimalsService.class);
+        this.userSessions = new ConcurrentHashMap<>();
     }
     @Override
     public void onUpdateEventReceived(Update update) throws Exception {
+
+        if(update.hasMessage() && update.getMessage().getChatId()!=null){
+            User user = new User();
+            UserSession userSession = new UserSession(DialogMode.MOCK,user,new LostAnimal(),0,new ArrayList<>(),0,0);
+            userSessions.putIfAbsent(update.getMessage().getChatId(),userSession);
+        }
+
         //TODO: основной функционал бота будем писать здесь
-        if (update.hasMessage() && update.getMessage().hasText()) {
+         if (update.hasMessage() && update.getMessage().hasText()) {
             String message ="";
             var data = update.getMessage();
             if(data!=null)
@@ -89,12 +101,12 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                     return;
                 case "/found_profiles":
                     dialogMode = DialogMode.SEE_FOUND;
-                    lostAnimalsList = null;
+                    lostAnimalList = null;
                     sendNextSwitcherKeyboard(update.getMessage().getChatId());
                     return;
                 case "/lost_profiles":
                     dialogMode = DialogMode.SEE_LOST;
-                    lostAnimalsList = null;
+                    lostAnimalList = null;
                     sendNextSwitcherKeyboard(update.getMessage().getChatId());
                     return;
                 case "/my_profiles":
@@ -105,8 +117,8 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                     }else if(currentUser.getLostAnimals()==null){
                         sendTextMessage("Похоже, у вас пока нет анкет");
                     }else{
-                        List<LostAnimals> lostAnimalsByCurrentUserList = lostAnimalsService.getAllByUser(currentUser);
-                        for(LostAnimals lostAnimal : lostAnimalsByCurrentUserList){
+                        List<LostAnimal> lostAnimalByCurrentUserList = lostAnimalsService.getAllByUser(currentUser);
+                        for(LostAnimal lostAnimal : lostAnimalByCurrentUserList){
                             sendPhotoMessageFromByteArray(lostAnimal.getImageData(),update.getMessage().getChatId());
                             sendHtmlMessage(lostAnimal.toString());
                         }
@@ -121,68 +133,70 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                 case LOST:
                     if(questionCount==0){
                         String tgUsername = update.getMessage().getFrom().getUserName();
-                        user.setTgId(tgUsername);
-                        user.setPhoneNumber(message);
+                        User currentUser = userSessions.get(update.getMessage().getChatId()).getUser();
+                        currentUser.setPhoneNumber(message);
+                        currentUser.setTgId(tgUsername);
                         sendAnimalTypeKeyboard(update.getMessage().getChatId());
                         return;
                     }if(questionCount==1){
                         sendTextMessage("Введите кличку животного");
                         int animalsAge = Integer.parseInt(message);
-                        lostAnimal.setAge(animalsAge);
+                        userSessions.get(update.getMessage().getChatId()).getLostAnimal().setAge(animalsAge);
                         questionCount = 2;
                         return;
                     }if(questionCount==2){//TODO: сделать енам на выбор пола и кнопку добавить - она в калбек квери на else if Будет обрабатываться
-                        lostAnimal.setName(message);
+                        userSessions.get(update.getMessage().getChatId()).getLostAnimal().setName(message);
                         sendSexTypeKeyboard(update.getMessage().getChatId());
                         return;
                     }if(questionCount==3){
                         sendTextMessage("Введите район пропажи");
-                        lostAnimal.setCity(message);
+                        userSessions.get(update.getMessage().getChatId()).getLostAnimal().setCity(message);
                         questionCount = 4;
                         return;
                     }if(questionCount==4){
                         sendTextMessage("Введите приметы животного в свободной форме");
 
-                        lostAnimal.setDistrict(message);
+                        userSessions.get(update.getMessage().getChatId()).getLostAnimal().setDistrict(message);
 
                         StatusType animalsStatus = StatusType.LOST;
-                        lostAnimal.setStatus(animalsStatus);
+                        userSessions.get(update.getMessage().getChatId()).getLostAnimal().setStatus(animalsStatus);
 
                         questionCount = 5;
                         return;
                     }if(questionCount==5){
                         sendTextMessage("Введите дату в формате гггг-мм-дд");
-                        lostAnimal.setDescription(message);
+                        userSessions.get(update.getMessage().getChatId()).getLostAnimal().setDescription(message);
                         questionCount = 6;
                         return;
                     }if(questionCount==6){
-                        handleEnteredDate(message,"Прикрепите фото животного как ФАЙЛ БЕЗ СЖАТИЯ.\n Размер фото до 1МБ включительно.");
+                        handleEnteredDate(message,"Прикрепите фото животного как ФАЙЛ БЕЗ СЖАТИЯ.\n Размер фото до 1МБ включительно.",update);
                         return;
                     }
                     break;
                 case FOUND://TODO: доработать ветку алгоритма
                     if(questionCount==0){
                         String tgUsername = update.getMessage().getFrom().getUserName();
-                        user.setTgId(tgUsername);
-                        user.setPhoneNumber(message);
+                        User currentUser = userSessions.get(update.getMessage().getChatId()).getUser();
+                        currentUser.setPhoneNumber(message);
+                        currentUser.setTgId(tgUsername);
                         sendAnimalTypeKeyboard(update.getMessage().getChatId());
-                        lostAnimal.setStatus(StatusType.FOUND);
+                        userSessions.get(update.getMessage().getChatId()).getLostAnimal().setStatus(StatusType.FOUND);
                         return;
                     }if(questionCount==1){
-                        lostAnimal.setCity(message);
+                        userSessions.get(update.getMessage().getChatId()).getLostAnimal().setCity(message);
                         sendTextMessage("Введите район, в котором нашли животное");
                         questionCount=2;
                         return;
                     }if(questionCount==2){
-                        lostAnimal.setDistrict(message);
+                        userSessions.get(update.getMessage().getChatId()).getLostAnimal().setDistrict(message);
                         sendSexTypeKeyboard(update.getMessage().getChatId());
                         return;
                     }
                     if(questionCount==3){
-                        handleEnteredDate(message,"Введите приметы животного");
+                        handleEnteredDate(message,"Введите приметы животного",update);
                         return;
                     }if(questionCount==4){
-                        lostAnimal.setDescription(message);
+                        userSessions.get(update.getMessage().getChatId()).getLostAnimal().setDescription(message);
                         sendTextMessage("Прикрепите фото животного как ФАЙЛ БЕЗ СЖАТИЯ.\n Размер фото до 1МБ включительно.");
                         return;
                     }
@@ -233,35 +247,37 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                     if(questionCount==7) {
                         //String fileId = update.getMessage().getPhoto().get(0).getFileId();
                         handleUserSendDocument(update,"Это финальный пункт.\nВот ваша анкета: ");
+                        User user = userSessions.get(update.getMessage().getChatId()).getUser();
                         if(userService.getUserByTgID(user.getTgId())!=null){
-                            lostAnimalsService.addAnimalForUser(user,lostAnimal);
+                            lostAnimalsService.addAnimalForUser(user,userSessions.get(update.getMessage().getChatId()).getLostAnimal());
                         }else{
                             if (user.getLostAnimals() == null) {
                                 user.setLostAnimals(new ArrayList<>());
                             }
-                            user.addLostAnimals(lostAnimal);
-                            lostAnimal.setUser(user);
+                            user.addLostAnimals(userSessions.get(update.getMessage().getChatId()).getLostAnimal());
+                            userSessions.get(update.getMessage().getChatId()).getLostAnimal().setUser(user);
                             userService.saveUser(user);
                         }
-                        sendPhotoMessageFromByteArray(lostAnimal.getImageData(),update.getMessage().getChatId());
-                        sendHtmlMessage(""+user+ lostAnimal);
+                        sendPhotoMessageFromByteArray(userSessions.get(update.getMessage().getChatId()).getLostAnimal().getImageData(),update.getMessage().getChatId());
+                        sendHtmlMessage(""+user+ userSessions.get(update.getMessage().getChatId()).getLostAnimal());
                         return;
                     }
                 case FOUND:
                     if(questionCount==4){
+                        User user = userSessions.get(update.getMessage().getChatId()).getUser();
                         handleUserSendDocument(update,"Это финальный пункт.\nВот ваша анкета: ");
                         if(userService.getUserByTgID(user.getTgId())!=null){
-                            lostAnimalsService.addAnimalForUser(user,lostAnimal);
+                            lostAnimalsService.addAnimalForUser(user,userSessions.get(update.getMessage().getChatId()).getLostAnimal());
                         }else{
                             if (user.getLostAnimals() == null) {
                                 user.setLostAnimals(new ArrayList<>());
                             }
-                            user.addLostAnimals(lostAnimal);
-                            lostAnimal.setUser(user);
+                            user.addLostAnimals(userSessions.get(update.getMessage().getChatId()).getLostAnimal());
+                            userSessions.get(update.getMessage().getChatId()).getLostAnimal().setUser(user);
                             userService.saveUser(user);
                         }
-                        sendPhotoMessageFromByteArray(lostAnimal.getImageData(),update.getMessage().getChatId());
-                        sendHtmlMessage(""+user+ lostAnimal);
+                        sendPhotoMessageFromByteArray(userSessions.get(update.getMessage().getChatId()).getLostAnimal().getImageData(),update.getMessage().getChatId());
+                        sendHtmlMessage(""+user+ userSessions.get(update.getMessage().getChatId()).getLostAnimal());
                         return;
                     }
                     return;
@@ -276,39 +292,39 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
         switch (nextStr){
             case "Показать анкету":
                 int size = 5;
-                if(lostAnimalsList == null || lostAnimalsList.isEmpty()){
+                if(lostAnimalList == null || lostAnimalList.isEmpty()){
                     PageRequest pageRequest = PageRequest.of(page,size, Sort.unsorted());
-                    lostAnimalsList = lostAnimalsService.getAllLostByStatusPartly(statusType,pageRequest);
-                    if(lostAnimalsList==null || lostAnimalsList.isEmpty()){
+                    lostAnimalList = lostAnimalsService.getAllLostByStatusPartly(statusType,pageRequest);
+                    if(lostAnimalList ==null || lostAnimalList.isEmpty()){
                         sendTextMessage("Тут пока нет новых анкет");
                         page=0;
                         currentNumberOfAnimal=0;
                         return;
                     }
-                    LostAnimals lostAnimal = lostAnimalsList.get(currentNumberOfAnimal);
+                    LostAnimal lostAnimal = lostAnimalList.get(currentNumberOfAnimal);
                     sendPhotoMessageFromByteArray(lostAnimal.getImageData(),update.getCallbackQuery().getMessage().getChatId());
                     sendHtmlMessage(lostAnimal.toStringForFoundOrLostPage());
                     currentNumberOfAnimal+=1;
                     sendNextSwitcherKeyboard(update.getCallbackQuery().getMessage().getChatId());
-                }else if(currentNumberOfAnimal == lostAnimalsList.size()){
+                }else if(currentNumberOfAnimal == lostAnimalList.size()){
                     currentNumberOfAnimal=0;
                     page+=1;
                     PageRequest pageRequest = PageRequest.of(page,size, Sort.unsorted());
-                    lostAnimalsList = lostAnimalsService.getAllLostByStatusPartly(statusType,pageRequest);
-                    if(lostAnimalsList==null || lostAnimalsList.isEmpty()){
+                    lostAnimalList = lostAnimalsService.getAllLostByStatusPartly(statusType,pageRequest);
+                    if(lostAnimalList ==null || lostAnimalList.isEmpty()){
                         sendTextMessage("Тут пока нет новых анкет");
                         page=0;
                         currentNumberOfAnimal=0;
                         return;
                     }else{
-                        LostAnimals lostAnimal = lostAnimalsList.get(currentNumberOfAnimal);
+                        LostAnimal lostAnimal = lostAnimalList.get(currentNumberOfAnimal);
                         sendPhotoMessageFromByteArray(lostAnimal.getImageData(),update.getCallbackQuery().getMessage().getChatId());
                         sendHtmlMessage(lostAnimal.toStringForFoundOrLostPage());
                         currentNumberOfAnimal+=1;
                         sendNextSwitcherKeyboard(update.getCallbackQuery().getMessage().getChatId());
                     }
                 }else{
-                    LostAnimals lostAnimal = lostAnimalsList.get(currentNumberOfAnimal);
+                    LostAnimal lostAnimal = lostAnimalList.get(currentNumberOfAnimal);
                     sendPhotoMessageFromByteArray(lostAnimal.getImageData(),update.getCallbackQuery().getMessage().getChatId());
                     sendHtmlMessage(lostAnimal.toStringForFoundOrLostPage());
                     currentNumberOfAnimal+=1;
@@ -332,7 +348,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
         File file = execute(new org.telegram.telegrambots.meta.api.methods.GetFile(fileId));
         String filePath = file.getFilePath();
         byte[] photo = downloadNewFile(filePath);
-        lostAnimal.setImageData(photo);
+        userSessions.get(update.getMessage().getChatId()).getLostAnimal().setImageData(photo);
         questionCount +=1;
         sendTextMessage(nextMessage);
         //sendPhotoAsFile(lostAnimal.getImageData(),update.getMessage().getChatId());
@@ -343,14 +359,14 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
 
         switch (sexType) {
             case "Девочка":
-                lostAnimal.setSex(SexType.FEMALE);
+                userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getLostAnimal().setSex(SexType.FEMALE);
                 break;
             case "Мальчик":
-                lostAnimal.setSex(SexType.MALE);
+                userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getLostAnimal().setSex(SexType.MALE);
                 break;
             default:
                 sendTextMessage("Введены невалидные данные, выберите пункт кнопки заново");
-                sendAnimalTypeKeyboard(update.getMessage().getChatId());
+                sendAnimalTypeKeyboard(update.getCallbackQuery().getMessage().getChatId());
                 return;
         }
         sendTextMessage("Вы выбрали: " + sexType);
@@ -363,15 +379,15 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
         boolean isReady = false;
         switch (animalsType) {
             case "Кошка":
-                lostAnimal.setType(AnimalType.CAT);
+                userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getLostAnimal().setType(AnimalType.CAT);
                 isReady = true;
                 break;
             case "Собака":
-                lostAnimal.setType(AnimalType.DOG);
+                userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getLostAnimal().setType(AnimalType.DOG);
                 isReady = true;
                 break;
             case "Птица":
-                lostAnimal.setType(AnimalType.PARROT);
+                userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getLostAnimal().setType(AnimalType.PARROT);
                 isReady = true;
                 break;
             default:
@@ -506,7 +522,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
         }
     }
     public void sendPhotoMessageFromByteArray(byte[] imageData,Long chatID) {
-        try (InputStream inputStream = new ByteArrayInputStream(imageData);){
+        try (InputStream inputStream = new ByteArrayInputStream(imageData)){
             // Используйте метод sendPhoto из вашей библиотеки Telegram
             SendPhoto sendPhoto = new SendPhoto();
             sendPhoto.setChatId(chatID); // Установите ID чата, куда отправляется фото
@@ -517,7 +533,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
             e.printStackTrace();
         }
     }
-    private void handleEnteredDate(String message,String nextMessage){
+    private void handleEnteredDate(String message,String nextMessage,Update update){
         String[] arr = message.split("-");
         if(arr.length<3){
             sendTextMessage("Невалидная дата. Введите дату в формате гггг-мм-дд.");
@@ -526,7 +542,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
         java.sql.Date date;
         try{
             date = Date.valueOf(message);
-            lostAnimal.setDate(date);
+            userSessions.get(update.getMessage().getChatId()).getLostAnimal().setDate(date);
             questionCount +=1;
             sendTextMessage(nextMessage);
         }catch (IllegalArgumentException e){

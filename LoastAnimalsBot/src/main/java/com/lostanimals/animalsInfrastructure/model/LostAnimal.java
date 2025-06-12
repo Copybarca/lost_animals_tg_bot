@@ -7,12 +7,11 @@ import jakarta.persistence.*;
 import org.springframework.stereotype.Component;
 
 import java.sql.Date;
-import java.util.Arrays;
 
 @Entity
 @Table(name = "lost_animals")
 @Component
-public class LostAnimals {
+public class LostAnimal {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id; // Уникальный идентификатор
@@ -54,7 +53,7 @@ public class LostAnimals {
     @JoinColumn(name = "user_id", nullable = false) // Внешний ключ
     private User user;
 
-    public LostAnimals(User user, String description, StatusType status, String district, String city, Integer age, SexType sex, String name, AnimalType type) {
+    public LostAnimal(User user, String description, StatusType status, String district, String city, Integer age, SexType sex, String name, AnimalType type) {
         this.user = user;
         this.description = description;
         this.status = status;
@@ -66,7 +65,7 @@ public class LostAnimals {
         this.type = type;
     }
     @Deprecated
-    public LostAnimals() {}
+    public LostAnimal() {}
 
     public Date getDate() {
         return date;
