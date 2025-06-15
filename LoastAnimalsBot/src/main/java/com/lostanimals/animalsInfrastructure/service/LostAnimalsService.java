@@ -27,12 +27,16 @@ public class LostAnimalsService {
     public List<LostAnimal> getAllByUser(User user){
         return (List<LostAnimal>) lostAnimalsRepository.findByUser(user);
     }
-    public void deleteLostAnimalsByUser(User user){
+    @Transactional
+    public void deleteAllLostAnimalsByUser(User user){
         lostAnimalsRepository.deleteAllByUser(user);
     }
     @Transactional
     public void addAnimalForUser(User user, LostAnimal newAnimal) {
         User userInDb = userRepository.findByTgId(user.getTgId());
+        if (userInDb == null) {
+            throw new IllegalArgumentException("Пользователь не найден");
+        }
         newAnimal.setUser(userInDb);
         lostAnimalsRepository.save(newAnimal);
     }

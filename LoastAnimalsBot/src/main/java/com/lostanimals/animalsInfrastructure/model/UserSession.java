@@ -38,7 +38,45 @@ public class UserSession {
         this.currentNumberOfAnimal = currentNumberOfAnimal;
         this.page = page;
     }
-
+    /**
+     * Увеличивает счетчик страниц
+     *
+     * Этот метод используется для прибавления количества страниц,
+     * которые были выгружены из бд. Каждый раз, когда вызывается
+     * этот метод, значение переменной {@code page} увеличивается
+     * на 1.
+     *
+     * @see #page
+     */
+    public void addPage(){
+        page+=1;
+    }
+    /**
+     * Увеличивает счетчик животных в списке пагинации на единицу.
+     *
+     * Этот метод используется для отслеживания количества просмотренных анкет на странице,
+     * которые были выгружены из бд. Каждый раз, когда вызывается
+     * этот метод, значение переменной {@code currentNumberOfAnimal} увеличивается
+     * на 1.
+     *
+     * @see #currentNumberOfAnimal
+     */
+    public void currentNumberOfAnimalAdd(){
+        currentNumberOfAnimal++;
+    }
+    /**
+     * Увеличивает счетчик вопросов на единицу.
+     *
+     * Этот метод используется для отслеживания количества вопросов,
+     * которые были заданы или обработаны. Каждый раз, когда вызывается
+     * этот метод, значение переменной {@code questionCount} увеличивается
+     * на 1.
+     *
+     * @see #questionCount
+     */
+    public void questionCountAdd(){
+        questionCount++;
+    }
     public void setDialogMode(DialogMode dialogMode) {
         this.dialogMode = dialogMode;
     }
