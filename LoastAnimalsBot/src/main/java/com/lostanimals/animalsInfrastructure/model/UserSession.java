@@ -48,7 +48,7 @@ public class UserSession {
      *
      * @see #page
      */
-    public void addPage(){
+    public synchronized void  addPage(){
         page+=1;
     }
     /**
@@ -61,7 +61,7 @@ public class UserSession {
      *
      * @see #currentNumberOfAnimal
      */
-    public void currentNumberOfAnimalAdd(){
+    public synchronized void currentNumberOfAnimalAdd(){
         currentNumberOfAnimal++;
     }
     /**
@@ -74,30 +74,30 @@ public class UserSession {
      *
      * @see #questionCount
      */
-    public void questionCountAdd(){
+    public synchronized void questionCountAdd(){
         questionCount++;
     }
-    public void setDialogMode(DialogMode dialogMode) {
+    public synchronized void setDialogMode(DialogMode dialogMode) {
         this.dialogMode = dialogMode;
     }
 
-    public void setLostAnimal(LostAnimal lostAnimal) {
+    public synchronized void setLostAnimal(LostAnimal lostAnimal) {
         this.lostAnimal = lostAnimal;
     }
 
-    public void setQuestionCount(int questionCount) {
+    public synchronized void setQuestionCount(int questionCount) {
         this.questionCount = questionCount;
     }
 
-    public void setLostAnimalsList(List<LostAnimal> lostAnimalList) {
+    public synchronized void setLostAnimalsList(List<LostAnimal> lostAnimalList) {
         this.lostAnimalList = lostAnimalList;
     }
 
-    public void setCurrentNumberOfAnimal(int currentNumberOfAnimal) {
+    public synchronized void setCurrentNumberOfAnimal(int currentNumberOfAnimal) {
         this.currentNumberOfAnimal = currentNumberOfAnimal;
     }
 
-    public void setPage(int page) {
+    public synchronized void setPage(int page) {
         this.page = page;
     }
 

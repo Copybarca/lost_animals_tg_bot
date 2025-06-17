@@ -33,24 +33,11 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
 
     private final UserService userService;
     private final LostAnimalsService lostAnimalsService;
-
-    //private DialogMode dialogMode = null;
-    //private final User user;// TODO: обезпасить в многопоточке
-    //private final LostAnimal lostAnimal;// TODO: обезпасить в многопоточке
-    //private int questionCount;// TODO: обезпасить в многопоточке
-   // private  List<LostAnimal> lostAnimalList;// TODO: обезпасить в многопоточке
-    //private int currentNumberOfAnimal = 0; // TODO: обезпасить в многопоточке
-    //private int page =0; // TODO: обезпасить в многопоточке
-    private  UserSession userSession;
-    private final ApplicationContext applicationContext;
     private AbstractMap<Long, UserSession> userSessions;
 
     public TinderBoltApp(ApplicationContext applicationContext) {
         super(Tokens.TELEGRAM_BOT_NAME, Tokens.TELEGRAM_BOT_TOKEN);
-        this.applicationContext=applicationContext;
         this.userService = applicationContext.getBean(UserService.class);
-        //this.user = applicationContext.getBean(User.class);
-        //this.lostAnimal = applicationContext.getBean(LostAnimal.class);
         this.lostAnimalsService = applicationContext.getBean(LostAnimalsService.class);
         this.userSessions = new ConcurrentHashMap<>();
     }
@@ -58,9 +45,8 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
     public void onUpdateEventReceived(Update update) throws Exception {
 
         if(update.hasMessage() && update.getMessage().getChatId()!=null){
-            User user = new User();
-            UserSession userSession = new UserSession(DialogMode.MOCK,user,new LostAnimal(),0,new ArrayList<>(),0,0);
-            userSessions.putIfAbsent(update.getMessage().getChatId(),userSession);
+            userSessions.computeIfAbsent(update.getMessage().getChatId(), id ->
+                    new UserSession(DialogMode.MOCK, new User(), new LostAnimal(), 0, new ArrayList<>(), 0, 0));
         }
 
         //TODO: основной функционал бота будем писать здесь
