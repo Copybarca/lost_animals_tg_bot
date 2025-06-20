@@ -273,55 +273,65 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
 
         }
     }
-    private void handleUserResponseToShowAnimalsByStatus(Update update,StatusType statusType){
+    private void handleUserResponseToShowAnimalsByStatus(Update update, StatusType statusType) {
         String nextStr = update.getCallbackQuery().getData();
-        switch (nextStr){
+        long chatId = update.getCallbackQuery().getMessage().getChatId();
+        UserSession userSession = userSessions.get(chatId);
+        int size = 5;
+
+        switch (nextStr) {
             case "Показать анкету":
-                int size = 5;
-                if(userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getLostAnimalsList() == null ||
-                   userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getLostAnimalsList().isEmpty()){
-                    PageRequest pageRequest = PageRequest.of(userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getPage(),size, Sort.unsorted());
-                    userSessions.get(update.getCallbackQuery().getMessage().getChatId()).setLostAnimalsList(lostAnimalsService.getAllLostByStatusPartly(statusType,pageRequest));
-                    if(userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getLostAnimalsList() ==null ||
-                       userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getLostAnimalsList().isEmpty()){
-                        sendTextMessage("Тут пока нет новых анкет");
-                        userSessions.get(update.getCallbackQuery().getMessage().getChatId()).setPage(0);
-                        userSessions.get(update.getCallbackQuery().getMessage().getChatId()).setCurrentNumberOfAnimal(0);
-                        return;
-                    }
-                    LostAnimal lostAnimal = userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getLostAnimalsList().get(userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getCurrentNumberOfAnimal());
-                    sendPhotoMessageFromByteArray(lostAnimal.getImageData(),update.getCallbackQuery().getMessage().getChatId());
-                    sendHtmlMessage(lostAnimal.toStringForFoundOrLostPage());
-                    userSessions.get(update.getCallbackQuery().getMessage().getChatId()).currentNumberOfAnimalAdd();
-                    sendNextSwitcherKeyboard(update.getCallbackQuery().getMessage().getChatId());
-                }else if( userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getCurrentNumberOfAnimal() == userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getLostAnimalsList().size()){
-                    userSessions.get(update.getCallbackQuery().getMessage().getChatId()).setCurrentNumberOfAnimal(0);
-                    userSessions.get(update.getCallbackQuery().getMessage().getChatId()).addPage();
-                    PageRequest pageRequest = PageRequest.of(userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getPage(),size, Sort.unsorted());
-                    userSessions.get(update.getCallbackQuery().getMessage().getChatId()).setLostAnimalsList(lostAnimalsService.getAllLostByStatusPartly(statusType,pageRequest));
-                    if(userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getLostAnimalsList() ==null || userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getLostAnimalsList().isEmpty()){
-                        sendTextMessage("Тут пока нет новых анкет");
-                        userSessions.get(update.getCallbackQuery().getMessage().getChatId()).setPage(0);
-                        userSessions.get(update.getCallbackQuery().getMessage().getChatId()).setCurrentNumberOfAnimal(0);
-                        return;
-                    }else{
-                        LostAnimal lostAnimal = userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getLostAnimalsList().get(userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getCurrentNumberOfAnimal());
-                        sendPhotoMessageFromByteArray(lostAnimal.getImageData(),update.getCallbackQuery().getMessage().getChatId());
-                        sendHtmlMessage(lostAnimal.toStringForFoundOrLostPage());
-                        userSessions.get(update.getCallbackQuery().getMessage().getChatId()).currentNumberOfAnimalAdd();
-                        sendNextSwitcherKeyboard(update.getCallbackQuery().getMessage().getChatId());
-                    }
-                }else{
-                    LostAnimal lostAnimal = userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getLostAnimalsList().get(userSessions.get(update.getCallbackQuery().getMessage().getChatId()).getCurrentNumberOfAnimal());
-                    sendPhotoMessageFromByteArray(lostAnimal.getImageData(),update.getCallbackQuery().getMessage().getChatId());
-                    sendHtmlMessage(lostAnimal.toStringForFoundOrLostPage());
-                    userSessions.get(update.getCallbackQuery().getMessage().getChatId()).currentNumberOfAnimalAdd();
-                    sendNextSwitcherKeyboard(update.getCallbackQuery().getMessage().getChatId());
-                }
+                showAnimalProfile(userSession, statusType, chatId, size);
+                break;
             default:
                 break;
         }
     }
+
+    private void showAnimalProfile(UserSession userSession, StatusType statusType, long chatId, int size) {
+        if (userSession.getLostAnimalsList() == null || userSession.getLostAnimalsList().isEmpty()) {
+            loadLostAnimals(userSession, statusType, size);
+        }
+
+        if (userSession.getLostAnimalsList() == null || userSession.getLostAnimalsList().isEmpty()) {
+            sendTextMessage("Тут пока нет новых анкет");
+            resetUserSession(userSession);
+            return;
+        }
+
+        if (userSession.getCurrentNumberOfAnimal() >= userSession.getLostAnimalsList().size()) {
+            userSession.setCurrentNumberOfAnimal(0);
+            userSession.addPage();
+            loadLostAnimals(userSession, statusType, size);
+
+            if (userSession.getLostAnimalsList() == null || userSession.getLostAnimalsList().isEmpty()) {
+                sendTextMessage("Тут пока нет новых анкет");
+                resetUserSession(userSession);
+                return;
+            }
+        }
+
+        sendCurrentAnimalProfile(userSession, chatId);
+    }
+
+    private void loadLostAnimals(UserSession userSession, StatusType statusType, int size) {
+        PageRequest pageRequest = PageRequest.of(userSession.getPage(), size, Sort.unsorted());
+        userSession.setLostAnimalsList(lostAnimalsService.getAllLostByStatusPartly(statusType, pageRequest));
+    }
+
+    private void sendCurrentAnimalProfile(UserSession userSession, long chatId) {
+        LostAnimal lostAnimal = userSession.getLostAnimalsList().get(userSession.getCurrentNumberOfAnimal());
+        sendPhotoMessageFromByteArray(lostAnimal.getImageData(), chatId);
+        sendHtmlMessage(lostAnimal.getUser().toString() + lostAnimal.toStringForFoundOrLostPage());
+        userSession.currentNumberOfAnimalAdd();
+        sendNextSwitcherKeyboard(chatId);
+    }
+
+    private void resetUserSession(UserSession userSession) {
+        userSession.setPage(0);
+        userSession.setCurrentNumberOfAnimal(0);
+    }
+
     private void handleUserSendDocument(Update update,String nextMessage) throws Exception {
         if(update.getMessage().getDocument()==null){
             sendTextMessage("Файл должен быть БЕЗ СЖАТИЯ.");
