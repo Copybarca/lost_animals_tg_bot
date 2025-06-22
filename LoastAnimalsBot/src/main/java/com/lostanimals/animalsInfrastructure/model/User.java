@@ -3,11 +3,11 @@ package com.lostanimals.animalsInfrastructure.model;
 import jakarta.persistence.*;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "users")
-@Component
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,9 +22,12 @@ public class User {
     public User(String tgId, String phoneNumber) {
         this.tgId = tgId;
         this.phoneNumber = phoneNumber;
+        lostAnimals = new ArrayList<>();
     }
     @Deprecated
-    public User() {}
+    public User() {
+        lostAnimals = new ArrayList<>();
+    }
 
     public void setTgId(String tgId) {
         this.tgId = tgId;
@@ -54,7 +57,7 @@ public class User {
     }                                                                                 
 
     public void addLostAnimals(LostAnimal lostAnimal) {
-        this.lostAnimals.add(lostAnimal);
+        lostAnimals.add(lostAnimal);
     }
     @Override
     public String toString() {

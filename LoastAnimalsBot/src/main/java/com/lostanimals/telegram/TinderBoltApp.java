@@ -56,6 +56,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
             if(data!=null)
                 message = data.getText()==null?"":data.getText();
             switch(message){// -- Начало меню выбора режима диалога --
+
                 case "/start":
                     userSessions.get(update.getMessage().getChatId()).setDialogMode(DialogMode.MAIN);
                     sendPhoto("main",update.getMessage().getChatId());
@@ -236,16 +237,18 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                         User user = userSessions.get(update.getMessage().getChatId()).getUser();
                         if(userService.getUserByTgID(user.getTgId())!=null){
                             lostAnimalsService.addAnimalForUser(user,userSessions.get(update.getMessage().getChatId()).getLostAnimal());
+                            userService.updateUser(user);
                         }else{
                             if (user.getLostAnimals() == null) {
                                 user.setLostAnimals(new ArrayList<>());
                             }
                             user.addLostAnimals(userSessions.get(update.getMessage().getChatId()).getLostAnimal());
                             userSessions.get(update.getMessage().getChatId()).getLostAnimal().setUser(user);
-                            userService.saveUser(user);
+                            userService.updateUser(user);
                         }
                         sendPhotoMessageFromByteArray(userSessions.get(update.getMessage().getChatId()).getLostAnimal().getImageData(),update.getMessage().getChatId());
                         sendHtmlMessage(""+user+ userSessions.get(update.getMessage().getChatId()).getLostAnimal());
+                        userSessions.get(update.getMessage().getChatId()).setLostAnimal(new LostAnimal());
                         return;
                     }
                 case FOUND:
@@ -264,6 +267,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
                         }
                         sendPhotoMessageFromByteArray(userSessions.get(update.getMessage().getChatId()).getLostAnimal().getImageData(),update.getMessage().getChatId());
                         sendHtmlMessage(""+user+ userSessions.get(update.getMessage().getChatId()).getLostAnimal());
+                        userSessions.get(update.getMessage().getChatId()).setLostAnimal(new LostAnimal());
                         return;
                     }
                     return;
@@ -339,7 +343,7 @@ public class TinderBoltApp extends MultiSessionTelegramBot {
         }
         if(update.getMessage().getDocument().getFileSize()> 1_048_576){
             sendTextMessage("Размер файла "+update.getMessage().getDocument().getFileSize() +"\n файл слишком велик." +
-                    "загрузите новое изоюражение.");
+                    "загрузите новое изображение.");
             return;
         }
         String fileId = update.getMessage().getDocument().getFileId();

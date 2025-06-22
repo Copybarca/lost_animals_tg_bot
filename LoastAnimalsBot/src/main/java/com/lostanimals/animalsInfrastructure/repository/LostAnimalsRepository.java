@@ -19,12 +19,10 @@ public interface LostAnimalsRepository extends CrudRepository<LostAnimal,Integer
     List<LostAnimal> findByStatus(@Param("status") StatusType status, PageRequest pageRequest);
 
     @Query("FROM LostAnimal l WHERE l.user = :user")
-    @Transactional
     List<LostAnimal> findByUser(User user);
 
 
     @Modifying
     @Query("DELETE FROM LostAnimal l WHERE l.user = :user")
-    @Transactional
     void deleteAllByUser(@Param("user") User user);
 }

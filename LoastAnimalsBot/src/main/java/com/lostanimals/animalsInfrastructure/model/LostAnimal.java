@@ -10,7 +10,6 @@ import java.sql.Date;
 
 @Entity
 @Table(name = "lost_animals")
-@Component
 public class LostAnimal {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

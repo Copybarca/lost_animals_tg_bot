@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Service
 public class LostAnimalsService {
@@ -21,23 +22,38 @@ public class LostAnimalsService {
         this.lostAnimalsRepository = lostAnimalsRepository;
         this.userRepository = userRepository;
     }
-    public List<LostAnimal> getAllLostByStatusPartly(StatusType status, PageRequest pageRequest){
+    private static ReentrantLock lock = new ReentrantLock();
+
+    public  List<LostAnimal> getAllLostByStatusPartly(StatusType status, PageRequest pageRequest){
         return (List<LostAnimal>) lostAnimalsRepository.findByStatus(status,pageRequest);
     }
+    @Transactional
     public List<LostAnimal> getAllByUser(User user){
         return (List<LostAnimal>) lostAnimalsRepository.findByUser(user);
     }
     @Transactional
     public void deleteAllLostAnimalsByUser(User user){
-        lostAnimalsRepository.deleteAllByUser(user);
+        lock.lock();
+        try {
+            lostAnimalsRepository.deleteAllByUser(user);
+        }finally {
+            lock.unlock();
+        }
+
     }
     @Transactional
     public void addAnimalForUser(User user, LostAnimal newAnimal) {
-        User userInDb = userRepository.findByTgId(user.getTgId());
-        if (userInDb == null) {
-            throw new IllegalArgumentException("Пользователь не найден");
+        lock.lock();
+        try{
+            User userInDb = userRepository.findByTgId(user.getTgId());
+            if (userInDb == null) {
+                throw new IllegalArgumentException("Пользователь не найден");
+            }
+            newAnimal.setUser(userInDb);
+            lostAnimalsRepository.save(newAnimal);
+        }finally {
+            lock.unlock();
         }
-        newAnimal.setUser(userInDb);
-        lostAnimalsRepository.save(newAnimal);
+
     }
 }
